@@ -18,9 +18,26 @@ class AnalyticalLinear(nn.Linear):
         if self.bias is not None:
             y_centered = y_target - self.bias.data
             
-        W_pinv = torch.linalg.pinv(self.weight.data.T)
+        try:
+            # rcond helps ignore tiny singular values that cause instability
+            W_pinv = torch.linalg.pinv(self.weight.data.T, rcond=1e-5)
+        except RuntimeError:
+            # Fallback if SVD fails to converge: W^+ = (W^T W + eps I)^-1 W^T
+            W_T = self.weight.data.T
+            eps = 1e-4
+            I = torch.eye(W_T.size(1), device=W_T.device, dtype=W_T.dtype)
+            W_pinv = torch.linalg.inv(W_T.T @ W_T + eps * I) @ W_T.T
+            
         x_target = y_centered @ W_pinv
         return x_target
+        
+    def _solve_ridge(self, A, B, lam=1e-3):
+        """
+        Solves (A^T A + \lambda I) X = A^T B for X.
+        This Tikhonov regularization guarantees invertibility and bounds weights.
+        """
+        I = torch.eye(A.size(1), device=A.device, dtype=A.dtype)
+        return torch.linalg.solve(A.T @ A + lam * I, A.T @ B)
         
     def solve_and_update(self, x_actual, y_target, lr=1.0):
         """
@@ -31,7 +48,7 @@ class AnalyticalLinear(nn.Linear):
             ones = torch.ones(x_actual.size(0), 1, dtype=x_actual.dtype, device=x_actual.device)
             x_aug = torch.cat([x_actual, ones], dim=1)
             
-            W_aug_T = torch.linalg.lstsq(x_aug, y_target).solution
+            W_aug_T = self._solve_ridge(x_aug, y_target)
             W_opt = W_aug_T.T
             
             dW = W_opt[:, :-1] - self.weight.data
@@ -40,7 +57,7 @@ class AnalyticalLinear(nn.Linear):
             self.weight.data += lr * dW
             self.bias.data += lr * db
         else:
-            W_T = torch.linalg.lstsq(x_actual, y_target).solution
+            W_T = self._solve_ridge(x_actual, y_target)
             W_opt = W_T.T
             
             dW = W_opt - self.weight.data

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
 import copy
 
 from core.analytical_linear import AnalyticalLinear
@@ -34,8 +35,8 @@ def create_model(num_layers, in_features=64, hidden_features=32, out_features=10
 
 
 def run_experiment(num_layers, X_train, y_train, Y_train_onehot, 
-                   X_test, y_test, epochs=150, eval_steps=10,
-                   base_lr=0.1, ana_lr_base=0.1, ana_decay_ratio=0.5, 
+                   X_test, y_test, epochs=150, eval_steps=10, batch_size=64,
+                   base_lr=0.1, ana_lr_base=0.01, ana_decay_ratio=0.5, 
                    criterion=nn.CrossEntropyLoss()):
     logger = BenchmarkLogger(f"{num_layers}-Layer Digits Classification")
     logger.print_header()
@@ -49,31 +50,40 @@ def run_experiment(num_layers, X_train, y_train, Y_train_onehot,
     # Optimizer for Gradient Descent Baseline
     optimizer = optim.SGD(gd_model.parameters(), lr=base_lr)
     
+    # Create DataLoader for batch-wise updates
+    dataset = TensorDataset(X_train, y_train, Y_train_onehot)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    
     for epoch in range(1, epochs + 1):
-        # --- Analytical Step ---
-        ana_pred = ana_model(X_train)
-        ana_metrics = calculate_classification_metrics(ana_pred.detach(), y_train)
-        
-        # Calculate dynamic learning rate for analytical model based on depth
-        ana_lr = ana_lr_base if num_layers > 1 else 1.0  # 1-layer can always take a full step
-        ana_decay = ana_decay_ratio if num_layers > 1 else 1.0
-        
-        ana_model.backward_target(Y_train_onehot, lr=ana_lr, lr_decay=ana_decay)
-        
-        # --- Baseline Step ---
-        optimizer.zero_grad()
-        gd_pred = gd_model(X_train)
-        
-        # Determine if criterion expects one-hot (MSE) or class indices (CrossEntropy)
-        if isinstance(criterion, nn.MSELoss):
-            loss = criterion(gd_pred, Y_train_onehot)
-        else:
-            loss = criterion(gd_pred, y_train)
+        for x_b, y_b, Y_onehot_b in dataloader:
+            # --- Analytical Step ---
+            ana_pred_b = ana_model(x_b)
             
-        loss.backward()
-        optimizer.step()
-        
-        gd_metrics = calculate_classification_metrics(gd_pred.detach(), y_train)
+            # Calculate dynamic learning rate for analytical model based on depth
+            ana_lr = ana_lr_base if num_layers > 1 else ana_lr_base
+            ana_decay = ana_decay_ratio if num_layers > 1 else 1.0
+            
+            ana_model.backward_target(Y_onehot_b, lr=ana_lr, lr_decay=ana_decay)
+            
+            # --- Baseline Step ---
+            optimizer.zero_grad()
+            gd_pred_b = gd_model(x_b)
+            
+            if isinstance(criterion, nn.MSELoss):
+                loss = criterion(gd_pred_b, Y_onehot_b)
+            else:
+                loss = criterion(gd_pred_b, y_b)
+                
+            loss.backward()
+            optimizer.step()
+            
+        # Calculate overall training metrics at the end of the epoch
+        with torch.no_grad():
+            ana_pred = ana_model(X_train)
+            ana_metrics = calculate_classification_metrics(ana_pred, y_train)
+            
+            gd_pred = gd_model(X_train)
+            gd_metrics = calculate_classification_metrics(gd_pred, y_train)
         
         # --- Evaluation Step ---
         ana_test_metrics = None
