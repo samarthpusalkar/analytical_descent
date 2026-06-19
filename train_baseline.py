@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from core.analytical_linear import AnalyticalLinear
+from core.inversions import AnalyticalLeakyReLU
+from models.analytical_network import AnalyticalSequential
 
 def test_1_layer():
     print("--- Testing 1-Layer Baseline Model (Gradient Descent) ---")
@@ -12,8 +15,8 @@ def test_1_layer():
     true_b = torch.randn(2)
     Y_target = X @ true_W + true_b
     
-    model = nn.Sequential(
-        nn.Linear(5, 2)
+    model = AnalyticalSequential(
+        AnalyticalLinear(5, 2)
     )
     
     optimizer = optim.SGD(model.parameters(), lr=0.1)
@@ -54,10 +57,10 @@ def test_2_layer():
     with torch.no_grad():
         Y_target = target_model(X)
         
-    model = nn.Sequential(
-        nn.Linear(5, 10),
-        nn.LeakyReLU(0.01),
-        nn.Linear(10, 2)
+    model = AnalyticalSequential(
+        AnalyticalLinear(5, 10),
+        AnalyticalLeakyReLU(0.01),
+        AnalyticalLinear(10, 2)
     )
     
     optimizer = optim.SGD(model.parameters(), lr=0.01)
