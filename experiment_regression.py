@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from models.analytical_network import AnalyticalSequential
-from core.analytical_linear import AnalyticalLinear
+from layers.analytical_linear import AnalyticalLinear
 from core.inversions import AnalyticalLeakyReLU
 
 def generate_data(num_samples=1000):

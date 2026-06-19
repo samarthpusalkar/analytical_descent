@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from core.analytical_linear import AnalyticalLinear
+from layers.analytical_linear import AnalyticalLinear
 from core.inversions import AnalyticalLeakyReLU
 from models.analytical_network import AnalyticalSequential
 

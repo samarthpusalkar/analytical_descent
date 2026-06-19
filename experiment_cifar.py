@@ -9,7 +9,7 @@ import numpy as np
 import copy
 
 from models.analytical_network import AnalyticalSequential
-from core.analytical_linear import AnalyticalLinear
+from layers.analytical_linear import AnalyticalLinear
 from core.inversions import AnalyticalLeakyReLU
 
 class BenchmarkLogger:

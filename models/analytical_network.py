@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from core.analytical_linear import AnalyticalLinear
+from layers.analytical_linear import AnalyticalLinear
 
 class AnalyticalSequential(nn.Module):
     """
