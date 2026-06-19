@@ -160,3 +160,13 @@ cython_debug/
 
 # Mac OS
 .DS_Store
+
+# Data and Results
+*.csv
+*.png
+*.jpg
+*.jpeg
+*.pdf
+plots/
+results/
+data/
