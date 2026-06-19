@@ -21,8 +21,18 @@ class AnalyticalLinear(nn.Linear):
         Solves (A^T A + \lambda I) X = A^T B for X.
         This Tikhonov regularization guarantees invertibility and bounds weights.
         """
-        I = torch.eye(A.size(1), device=A.device, dtype=A.dtype)
-        return torch.linalg.solve(A.T @ A + lam * I, A.T @ B)
+        N, D = A.shape
+        device = A.device
+        
+        # Woodbury Matrix Identity for N < D (Small Batch, Large Feature Space)
+        # (A^T A + \lambda I)^{-1} A^T B = A^T (A A^T + \lambda I)^{-1} B
+        # This reduces inversion from O(D^3) to O(N^3), astronomically faster for small batches!
+        if N < D:
+            I_N = torch.eye(N, device=device)
+            return A.T @ torch.linalg.solve(A @ A.T + lam * I_N, B)
+        else:
+            I_D = torch.eye(D, device=device)
+            return torch.linalg.solve(A.T @ A + lam * I_D, A.T @ B)
         
     def solve_and_update(self, x_actual, y_target, lr=1.0):
         """
