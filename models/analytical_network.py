@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 from layers.analytical_linear import AnalyticalLinear
+from layers.analytical_conv import AnalyticalConv2d
+from layers.analytical_flatten import AnalyticalFlatten
+from core.inversions import AnalyticalLeakyReLU
 
 class AnalyticalSequential(nn.Module):
     """
@@ -41,7 +44,7 @@ class AnalyticalSequential(nn.Module):
             h_out_actual = self.layer_inputs[idx + 1]
             
             if hasattr(layer, 'propagate_error'):
-                if isinstance(layer, AnalyticalLinear):
+                if isinstance(layer, (AnalyticalLinear, AnalyticalConv2d, AnalyticalFlatten)):
                     # Target is the actual representation nudged by the error
                     h_target = h_out_actual + current_error
                     
