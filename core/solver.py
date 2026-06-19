@@ -18,13 +18,20 @@ def compute_analytical_delta(x_in, error, lam=1e-3, max_norm=1.0):
     
     # Woodbury Matrix Identity for N < D (Small Batch, Large Feature Space)
     # This mathematically guarantees the same pseudo-inverse but reduces 
-    # complexity from O(D^3) to O(N^3), preserving the exact null-space dimensions.
+    # complexity from O(D^3) to O(N^3).
+    # OPTIMIZATION: We use Cholesky Decomposition instead of standard LU solve. 
+    # Since A @ A^T + lam * I is symmetric positive definite (SPD), Cholesky is 
+    # exactly 2x faster (1/3 N^3 vs 2/3 N^3) and numerically superior.
     if N < D:
         I_N = torch.eye(N, device=device)
-        dW_T = x_in.T @ torch.linalg.solve(x_in @ x_in.T + lam * I_N, error)
+        M = x_in @ x_in.T + lam * I_N
+        L = torch.linalg.cholesky(M)
+        dW_T = x_in.T @ torch.cholesky_solve(error, L)
     else:
         I_D = torch.eye(D, device=device)
-        dW_T = torch.linalg.solve(x_in.T @ x_in + lam * I_D, x_in.T @ error)
+        M = x_in.T @ x_in + lam * I_D
+        L = torch.linalg.cholesky(M)
+        dW_T = torch.cholesky_solve(x_in.T @ error, L)
         
     dW = dW_T.T
     
