@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -85,7 +88,7 @@ def run_regression_experiment(epochs=100, batch_size=32):
     plt.plot(x_plot.numpy(), y_gd.numpy(), 'b-', label='Gradient Descent', linewidth=2)
     plt.legend()
     plt.title("Regression: Analytical Pseudo-Inverse vs Adam")
-    plt.savefig("regression_plot.png")
+    plt.savefig("../../../results/regression/synthetic/regression_plot.png")
     print("Saved plot to regression_plot.png")
 
 if __name__ == '__main__':

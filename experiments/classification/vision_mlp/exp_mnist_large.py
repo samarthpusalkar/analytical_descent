@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -57,27 +60,27 @@ def evaluate(model, dataloader, criterion, is_analytical=False):
 
 def run_experiment(epochs=10, eval_steps=1, batch_size=16,
                    base_lr=0.01, ana_lr_base=0.07, ana_decay_ratio=0.70):
-    logger = BenchmarkLogger("4-Layer CIFAR10 Classification")
+    logger = BenchmarkLogger("4-Layer MNIST Classification")
     
-    # 1. Load CIFAR10 Dataset
+    # 1. Load MNIST Dataset
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.1307,), (0.3081,)),
         transforms.Lambda(lambda x: torch.flatten(x))
     ])
     
-    train_dataset = datasets.CIFAR10('./data', train=True, download=True, transform=transform)
-    test_dataset = datasets.CIFAR10('./data', train=False, download=True, transform=transform)
+    train_dataset = datasets.MNIST('./data', train=True, download=True, transform=transform)
+    test_dataset = datasets.MNIST('./data', train=False, download=True, transform=transform)
     
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
     criterion = nn.CrossEntropyLoss()
     
-    # 2. Build 4-Layer Models (3072 -> 256 -> 128 -> 64 -> 10)
+    # 2. Build 4-Layer Models (784 -> 256 -> 128 -> 64 -> 10)
     # Baseline Model (Gradient Descent)
     # gd_model = nn.Sequential(
-    #     nn.Linear(3072, 256), nn.LeakyReLU(0.01),
+    #     nn.Linear(784, 256), nn.LeakyReLU(0.01),
     #     nn.Linear(256, 128), nn.LeakyReLU(0.01),
     #     nn.Linear(128, 64), nn.LeakyReLU(0.01),
     #     nn.Linear(64, 10)
@@ -86,7 +89,7 @@ def run_experiment(epochs=10, eval_steps=1, batch_size=16,
     
     # Analytical Model
     ana_model = AnalyticalSequential(
-        AnalyticalLinear(3072, 256), AnalyticalLeakyReLU(0.01),
+        AnalyticalLinear(784, 256), AnalyticalLeakyReLU(0.01),
         AnalyticalLinear(256, 128), AnalyticalLeakyReLU(0.01),
         AnalyticalLinear(128, 64), AnalyticalLeakyReLU(0.01),
         AnalyticalLinear(64, 10)
@@ -159,9 +162,9 @@ def run_experiment(epochs=10, eval_steps=1, batch_size=16,
         print(f"  --> Epoch {epoch} finished in {time.time()-start_t:.1f}s")
                         
     print("-" * 115)
-    print("\nBenchmark complete. Results saved to benchmark_cifar10_results.csv")
+    print("\nBenchmark complete. Results saved to benchmark_mnist_results.csv")
     df = pd.DataFrame(logger.results)
-    df.to_csv("benchmark_cifar10_results.csv", index=False)
+    df.to_csv("../../../results/classification/vision_mlp/benchmark_mnist_results.csv", index=False)
 
 if __name__ == "__main__":
     run_experiment()

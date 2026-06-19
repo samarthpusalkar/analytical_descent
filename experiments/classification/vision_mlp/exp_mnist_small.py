@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -100,7 +103,7 @@ def run_experiment(num_layers, X_train, y_train, Y_train_onehot,
         # Log
         logger.log_step(epoch, ana_metrics, gd_metrics, ana_test_metrics, gd_test_metrics)
         
-    logger.save_to_csv()
+    logger.save_to_csv("../../../results/classification/vision_mlp/benchmark_results.csv")
     print("-" * 75)
 
 
