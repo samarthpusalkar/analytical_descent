@@ -64,7 +64,7 @@ def test_2_layer():
         print(f" {epoch:5d} | {loss:.6f}")
         
         # Use a smaller learning rate for stability in deep models
-        model.backward_target(Y_target, lr=0.1, lr_decay=0.5)
+        model.backward_target(Y_target, lr=0.01, lr_decay=0.5)
         
     # Final evaluation
     Y_pred = model(X)
