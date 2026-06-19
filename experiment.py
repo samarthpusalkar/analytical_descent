@@ -33,7 +33,8 @@ def create_model(num_layers, in_features=64, hidden_features=32, out_features=10
     return AnalyticalSequential(*layers)
 
 
-def run_experiment(num_layers, X_train, y_train, Y_train_onehot, epochs=15, 
+def run_experiment(num_layers, X_train, y_train, Y_train_onehot, 
+                   X_test, y_test, epochs=15, eval_steps=1,
                    base_lr=0.01, ana_lr_base=0.01, ana_decay_ratio=0.5, 
                    criterion=nn.MSELoss()):
     logger = BenchmarkLogger(f"{num_layers}-Layer Digits Classification")
@@ -74,8 +75,20 @@ def run_experiment(num_layers, X_train, y_train, Y_train_onehot, epochs=15,
         
         gd_metrics = calculate_classification_metrics(gd_pred.detach(), y_train)
         
+        # --- Evaluation Step ---
+        ana_test_metrics = None
+        gd_test_metrics = None
+        
+        if epoch % eval_steps == 0 or epoch == epochs:
+            with torch.no_grad():
+                ana_test_pred = ana_model(X_test)
+                ana_test_metrics = calculate_classification_metrics(ana_test_pred, y_test)
+                
+                gd_test_pred = gd_model(X_test)
+                gd_test_metrics = calculate_classification_metrics(gd_test_pred, y_test)
+        
         # Log
-        logger.log_step(epoch, ana_metrics, gd_metrics)
+        logger.log_step(epoch, ana_metrics, gd_metrics, ana_test_metrics, gd_test_metrics)
         
     logger.save_to_csv()
     print("-" * 75)
@@ -87,8 +100,11 @@ if __name__ == "__main__":
     print(f"Loaded Scikit-Learn Digits: Train Size={X_train.shape[0]}, Features={X_train.shape[1]}")
     
     # Run Benchmark for varying depths
-    run_experiment(num_layers=1, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, epochs=15)
-    run_experiment(num_layers=2, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, epochs=15)
-    run_experiment(num_layers=3, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, epochs=15)
+    run_experiment(num_layers=1, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, 
+                   X_test=X_test, y_test=y_test, epochs=15)
+    run_experiment(num_layers=2, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, 
+                   X_test=X_test, y_test=y_test, epochs=15)
+    run_experiment(num_layers=3, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, 
+                   X_test=X_test, y_test=y_test, epochs=15)
     
     print("\nBenchmark complete. Results saved to benchmark_results.csv")
