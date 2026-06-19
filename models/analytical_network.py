@@ -10,46 +10,44 @@ class AnalyticalSequential(nn.Module):
     def __init__(self, *modules):
         super().__init__()
         self.layers = nn.ModuleList(modules)
-        self.network_input = None
+        self.layer_inputs = []
+        self.network_output = None
         
     def forward(self, x):
-        self.network_input = x.clone().detach()
+        self.layer_inputs = [x.clone().detach()]
         for layer in self.layers:
             x = layer(x)
+            self.layer_inputs.append(x.clone().detach())
+        self.network_output = x.clone().detach()
         return x
         
     def backward_target(self, final_target, lr=1.0, lr_decay=1.0):
         """
-        Implements Two-Phase Forward-Update for Analytical Target Propagation.
+        Implements Forward-First Gradient-Nudged Target Propagation.
         """
-        # Phase 1: Back-calculate targets
-        layer_targets = {}
-        layer_lrs = {}
-        current_target = final_target
+        # Phase 1: Forward pass is already done, actual representations are cached.
+        
+        # Calculate output error
+        current_error = final_target - self.network_output
         current_lr = lr
         
-        # Traverse in reverse to compute targets
+        # Phase 2: Traverse backwards, update weights mapping actual_in -> actual_out + error
         for idx in range(len(self.layers) - 1, -1, -1):
             layer = self.layers[idx]
-            if hasattr(layer, 'inverse_func'):
-                current_target = layer.inverse_func(current_target)
-                layer_targets[idx] = current_target
-            elif isinstance(layer, AnalyticalLinear):
-                layer_targets[idx] = current_target
-                layer_lrs[idx] = current_lr
-                # Calculate input target for previous layer using pseudo-inverse
-                current_target = layer.get_input_target(current_target)
-                current_lr *= lr_decay
-                
-        # Phase 2: Forward update
-        x = self.network_input
-        for idx, layer in enumerate(self.layers):
-            if isinstance(layer, AnalyticalLinear):
-                target = layer_targets[idx]
-                layer_lr = layer_lrs[idx]
-                
-                # Solve least squares to map CURRENT 'x' to 'target' and apply update
-                layer.solve_and_update(x, target, lr=layer_lr)
-                
-            # Pass x through the newly updated layer to get exact input for next layer
-            x = layer(x)
+            h_in = self.layer_inputs[idx]
+            h_out_actual = self.layer_inputs[idx + 1]
+            
+            if hasattr(layer, 'propagate_error'):
+                if isinstance(layer, AnalyticalLinear):
+                    # Target is the actual representation nudged by the error
+                    h_target = h_out_actual + current_error
+                    
+                    # Update weights to map actual input to the nudged target
+                    layer.solve_and_update(h_in, h_target, lr=current_lr)
+                    
+                    # Propagate error backwards through the linear layer
+                    current_error = layer.propagate_error(current_error)
+                    current_lr *= lr_decay
+                else:
+                    # Activation layer (AnalyticalLeakyReLU)
+                    current_error = layer.propagate_error(current_error, h_in)

@@ -9,27 +9,12 @@ class AnalyticalLinear(nn.Linear):
     def __init__(self, in_features, out_features, bias=True):
         super().__init__(in_features, out_features, bias)
         
-    def get_input_target(self, y_target):
+    def propagate_error(self, output_error):
         """
-        Back-calculates the target input for this layer given a target output.
-        x_target = (y_target - b) @ pinv(W^T)
+        Propagates the error backward through the layer using the transpose of the weights.
+        This preserves the null space of the forward representation.
         """
-        y_centered = y_target
-        if self.bias is not None:
-            y_centered = y_target - self.bias.data
-            
-        try:
-            # rcond helps ignore tiny singular values that cause instability
-            W_pinv = torch.linalg.pinv(self.weight.data.T, rcond=1e-5)
-        except RuntimeError:
-            # Fallback if SVD fails to converge: W^+ = (W^T W + eps I)^-1 W^T
-            W_T = self.weight.data.T
-            eps = 1e-4
-            I = torch.eye(W_T.size(1), device=W_T.device, dtype=W_T.dtype)
-            W_pinv = torch.linalg.inv(W_T.T @ W_T + eps * I) @ W_T.T
-            
-        x_target = y_centered @ W_pinv
-        return x_target
+        return output_error @ self.weight.data
         
     def _solve_ridge(self, A, B, lam=1e-3):
         """

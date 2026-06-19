@@ -31,3 +31,8 @@ class AnalyticalLeakyReLU(nn.LeakyReLU):
         
     def inverse_func(self, y):
         return self.inverse_module(y)
+        
+    def propagate_error(self, output_error, h_in):
+        mask = (h_in > 0).float()
+        derivative = mask + self.negative_slope * (1 - mask)
+        return output_error * derivative
