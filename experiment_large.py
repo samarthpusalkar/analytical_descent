@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 import time
 import pandas as pd
 import numpy as np
+import copy
 
 from models.analytical_network import AnalyticalSequential
 from core.analytical_linear import AnalyticalLinear
@@ -75,13 +76,13 @@ def run_experiment(epochs=10, eval_steps=1, batch_size=16,
     
     # 2. Build 4-Layer Models (784 -> 256 -> 128 -> 64 -> 10)
     # Baseline Model (Gradient Descent)
-    gd_model = nn.Sequential(
-        nn.Linear(784, 256), nn.LeakyReLU(0.01),
-        nn.Linear(256, 128), nn.LeakyReLU(0.01),
-        nn.Linear(128, 64), nn.LeakyReLU(0.01),
-        nn.Linear(64, 10)
-    )
-    optimizer = optim.Adam(gd_model.parameters(), lr=base_lr)
+    # gd_model = nn.Sequential(
+    #     nn.Linear(784, 256), nn.LeakyReLU(0.01),
+    #     nn.Linear(256, 128), nn.LeakyReLU(0.01),
+    #     nn.Linear(128, 64), nn.LeakyReLU(0.01),
+    #     nn.Linear(64, 10)
+    # )
+    # optimizer = optim.Adam(gd_model.parameters(), lr=base_lr)
     
     # Analytical Model
     ana_model = AnalyticalSequential(
@@ -90,7 +91,9 @@ def run_experiment(epochs=10, eval_steps=1, batch_size=16,
         AnalyticalLinear(128, 64), AnalyticalLeakyReLU(0.01),
         AnalyticalLinear(64, 10)
     )
-    
+
+    gd_model = copy.deepcopy(ana_model)
+    optimizer = optim.Adam(gd_model.parameters(), lr=base_lr)
     logger.print_header()
     
     # 3. Training Loop
