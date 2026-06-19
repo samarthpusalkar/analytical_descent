@@ -55,7 +55,7 @@ def evaluate(model, dataloader, criterion, is_analytical=False):
     return total_loss / total, correct / total
 
 def run_experiment(epochs=3, eval_steps=1, batch_size=256,
-                   base_lr=0.01, ana_lr_base=0.005, ana_decay_ratio=1.0):
+                   base_lr=0.01, ana_lr_base=0.0005, ana_decay_ratio=1.0):
     logger = BenchmarkLogger("4-Layer MNIST Classification")
     
     # 1. Load MNIST Dataset

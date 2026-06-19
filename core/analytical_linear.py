@@ -26,24 +26,39 @@ class AnalyticalLinear(nn.Linear):
         
     def solve_and_update(self, x_actual, y_target, lr=1.0):
         """
-        Solves for the optimal weights to map x_actual to y_target and applies 
-        the update with the given learning rate.
+        Calculates the optimal weight updates using Delta-Regularized Ridge Regression.
+        This minimizes ||X_aug (W + dW)^T - Y_target||^2 + lam ||dW||^2.
+        dW^T = (X_aug^T X_aug + lam I)^-1 X_aug^T (Y_target - X_aug W^T)
         """
+        # We want to map x_actual -> y_target.
+        
         if self.bias is not None:
+            # Augment x with ones for bias trick
             ones = torch.ones(x_actual.size(0), 1, dtype=x_actual.dtype, device=x_actual.device)
             x_aug = torch.cat([x_actual, ones], dim=1)
+            W_aug = torch.cat([self.weight.data, self.bias.data.unsqueeze(1)], dim=1)
             
-            W_aug_T = self._solve_ridge(x_aug, y_target)
-            W_opt = W_aug_T.T
+            # Calculate current prediction and error
+            y_pred = x_aug @ W_aug.T
+            error = y_target - y_pred
             
-            dW = W_opt[:, :-1] - self.weight.data
-            db = W_opt[:, -1] - self.bias.data
+            # Solve for delta
+            dW_aug_T = self._solve_ridge(x_aug, error)
+            dW_aug = dW_aug_T.T
+            
+            # Extract weights and bias deltas
+            dW = dW_aug[:, :-1]
+            db = dW_aug[:, -1]
             
             self.weight.data += lr * dW
             self.bias.data += lr * db
         else:
-            W_T = self._solve_ridge(x_actual, y_target)
-            W_opt = W_T.T
+            # Calculate current prediction and error
+            y_pred = x_actual @ self.weight.data.T
+            error = y_target - y_pred
             
-            dW = W_opt - self.weight.data
+            # Solve for delta
+            dW_T = self._solve_ridge(x_actual, error)
+            dW = dW_T.T
+            
             self.weight.data += lr * dW
