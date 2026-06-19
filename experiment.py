@@ -34,9 +34,9 @@ def create_model(num_layers, in_features=64, hidden_features=32, out_features=10
 
 
 def run_experiment(num_layers, X_train, y_train, Y_train_onehot, 
-                   X_test, y_test, epochs=15, eval_steps=1,
-                   base_lr=0.01, ana_lr_base=0.01, ana_decay_ratio=0.5, 
-                   criterion=nn.MSELoss()):
+                   X_test, y_test, epochs=150, eval_steps=10,
+                   base_lr=0.1, ana_lr_base=0.1, ana_decay_ratio=0.5, 
+                   criterion=nn.CrossEntropyLoss()):
     logger = BenchmarkLogger(f"{num_layers}-Layer Digits Classification")
     logger.print_header()
     
@@ -101,10 +101,10 @@ if __name__ == "__main__":
     
     # Run Benchmark for varying depths
     run_experiment(num_layers=1, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, 
-                   X_test=X_test, y_test=y_test, epochs=15)
+                   X_test=X_test, y_test=y_test, epochs=150)
     run_experiment(num_layers=2, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, 
-                   X_test=X_test, y_test=y_test, epochs=15)
+                   X_test=X_test, y_test=y_test, epochs=150)
     run_experiment(num_layers=3, X_train=X_train, y_train=y_train, Y_train_onehot=Y_train_onehot, 
-                   X_test=X_test, y_test=y_test, epochs=15)
+                   X_test=X_test, y_test=y_test, epochs=150)
     
     print("\nBenchmark complete. Results saved to benchmark_results.csv")
