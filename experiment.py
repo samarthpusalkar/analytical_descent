@@ -33,7 +33,9 @@ def create_model(num_layers, in_features=64, hidden_features=32, out_features=10
     return AnalyticalSequential(*layers)
 
 
-def run_experiment(num_layers, X_train, y_train, Y_train_onehot, epochs=15):
+def run_experiment(num_layers, X_train, y_train, Y_train_onehot, epochs=15, 
+                   base_lr=0.01, ana_lr_base=0.01, ana_decay_ratio=0.5, 
+                   criterion=nn.MSELoss()):
     logger = BenchmarkLogger(f"{num_layers}-Layer Digits Classification")
     logger.print_header()
     
@@ -44,17 +46,16 @@ def run_experiment(num_layers, X_train, y_train, Y_train_onehot, epochs=15):
     gd_model = copy.deepcopy(base_model)
     
     # Optimizer for Gradient Descent Baseline
-    optimizer = optim.SGD(gd_model.parameters(), lr=0.01)
+    optimizer = optim.SGD(gd_model.parameters(), lr=base_lr)
     
     for epoch in range(1, epochs + 1):
         # --- Analytical Step ---
         ana_pred = ana_model(X_train)
         ana_metrics = calculate_classification_metrics(ana_pred.detach(), y_train)
         
-        # We need lr_decay and smaller base lr for deeper models
-        # For 1 layer, lr=1.0 works perfectly. For deeper, we need small steps.
-        ana_lr = 1.0 if num_layers == 1 else (0.1 if num_layers == 2 else 0.05)
-        ana_decay = 1.0 if num_layers == 1 else (0.5 if num_layers == 2 else 0.5)
+        # Calculate dynamic learning rate for analytical model based on depth
+        ana_lr = ana_lr_base if num_layers > 1 else 1.0  # 1-layer can always take a full step
+        ana_decay = ana_decay_ratio if num_layers > 1 else 1.0
         
         ana_model.backward_target(Y_train_onehot, lr=ana_lr, lr_decay=ana_decay)
         
@@ -62,9 +63,12 @@ def run_experiment(num_layers, X_train, y_train, Y_train_onehot, epochs=15):
         optimizer.zero_grad()
         gd_pred = gd_model(X_train)
         
-        # MSE against one-hot for fair apples-to-apples comparison
-        # (Though cross-entropy is standard for classification, we want the exact same objective landscape)
-        loss = nn.MSELoss()(gd_pred, Y_train_onehot)
+        # Determine if criterion expects one-hot (MSE) or class indices (CrossEntropy)
+        if isinstance(criterion, nn.MSELoss):
+            loss = criterion(gd_pred, Y_train_onehot)
+        else:
+            loss = criterion(gd_pred, y_train)
+            
         loss.backward()
         optimizer.step()
         

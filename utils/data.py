@@ -13,12 +13,13 @@ def get_digits_dataset():
     data = load_digits()
     X, y = data.data, data.target
     
-    # Scale features
-    scaler = StandardScaler()
-    X = scaler.fit_transform(X)
-    
-    # Split
+    # Split first to prevent data leakage
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Scale features (fit ONLY on training data to prevent leakage)
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
     
     # Convert to PyTorch tensors
     X_train = torch.tensor(X_train, dtype=torch.float32)
