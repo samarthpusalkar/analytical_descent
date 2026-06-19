@@ -25,10 +25,13 @@ class AnalyticalSequential(nn.Module):
         """
         Implements Forward-First Gradient-Nudged Target Propagation.
         """
-        # Phase 1: Forward pass is already done, actual representations are cached.
-        
         # Calculate output error
-        current_error = final_target - self.network_output
+        # We use the gradient of the Huber Loss (clamped MSE) to prevent
+        # massive gradient explosions from large confident logits while preserving
+        # the stabilizing 'spring' effect of MSE for bounded regression.
+        raw_error = final_target - self.network_output
+        current_error = torch.clamp(raw_error, min=-1.0, max=1.0)
+            
         current_lr = lr
         
         # Phase 2: Traverse backwards, update weights mapping actual_in -> actual_out + error
@@ -42,11 +45,14 @@ class AnalyticalSequential(nn.Module):
                     # Target is the actual representation nudged by the error
                     h_target = h_out_actual + current_error
                     
-                    # Update weights to map actual input to the nudged target
+                    # 1. Propagate error backwards through the linear layer using OLD weights
+                    next_error = layer.propagate_error(current_error)
+                    
+                    # 2. Update weights safely to map actual input to the nudged target
                     layer.solve_and_update(h_in, h_target, lr=current_lr)
                     
-                    # Propagate error backwards through the linear layer
-                    current_error = layer.propagate_error(current_error)
+                    # 3. Advance to next layer
+                    current_error = next_error
                     current_lr *= lr_decay
                 else:
                     # Activation layer (AnalyticalLeakyReLU)

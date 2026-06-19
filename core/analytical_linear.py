@@ -50,6 +50,16 @@ class AnalyticalLinear(nn.Linear):
             dW = dW_aug[:, :-1]
             db = dW_aug[:, -1]
             
+            # Clip gradients to prevent massive steps from conditioning noise
+            max_norm = 1.0
+            norm_w = torch.norm(dW)
+            if norm_w > max_norm:
+                dW = dW * (max_norm / norm_w)
+                
+            norm_b = torch.norm(db)
+            if norm_b > max_norm:
+                db = db * (max_norm / norm_b)
+            
             self.weight.data += lr * dW
             self.bias.data += lr * db
         else:
@@ -60,5 +70,11 @@ class AnalyticalLinear(nn.Linear):
             # Solve for delta
             dW_T = self._solve_ridge(x_actual, error)
             dW = dW_T.T
+            
+            # Clip gradients to prevent massive steps from conditioning noise
+            max_norm = 1.0
+            norm = torch.norm(dW)
+            if norm > max_norm:
+                dW = dW * (max_norm / norm)
             
             self.weight.data += lr * dW
