@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from core.solver import compute_analytical_delta
 
 class AnalyticalLinear(nn.Linear):
     """
@@ -16,23 +17,6 @@ class AnalyticalLinear(nn.Linear):
         """
         return output_error @ self.weight.data
         
-    def _solve_ridge(self, A, B, lam=1e-3):
-        """
-        Solves (A^T A + \lambda I) X = A^T B for X.
-        This Tikhonov regularization guarantees invertibility and bounds weights.
-        """
-        N, D = A.shape
-        device = A.device
-        
-        # Woodbury Matrix Identity for N < D (Small Batch, Large Feature Space)
-        # (A^T A + \lambda I)^{-1} A^T B = A^T (A A^T + \lambda I)^{-1} B
-        # This reduces inversion from O(D^3) to O(N^3), astronomically faster for small batches!
-        if N < D:
-            I_N = torch.eye(N, device=device)
-            return A.T @ torch.linalg.solve(A @ A.T + lam * I_N, B)
-        else:
-            I_D = torch.eye(D, device=device)
-            return torch.linalg.solve(A.T @ A + lam * I_D, A.T @ B)
         
     def solve_and_update(self, x_actual, y_target, lr=1.0):
         """
@@ -53,22 +37,11 @@ class AnalyticalLinear(nn.Linear):
             error = y_target - y_pred
             
             # Solve for delta
-            dW_aug_T = self._solve_ridge(x_aug, error)
-            dW_aug = dW_aug_T.T
+            dW_aug = compute_analytical_delta(x_aug, error, lam=1e-3, max_norm=1.0)
             
             # Extract weights and bias deltas
             dW = dW_aug[:, :-1]
             db = dW_aug[:, -1]
-            
-            # Clip gradients to prevent massive steps from conditioning noise
-            max_norm = 1.0
-            norm_w = torch.norm(dW)
-            if norm_w > max_norm:
-                dW = dW * (max_norm / norm_w)
-                
-            norm_b = torch.norm(db)
-            if norm_b > max_norm:
-                db = db * (max_norm / norm_b)
             
             self.weight.data += lr * dW
             self.bias.data += lr * db
@@ -78,13 +51,6 @@ class AnalyticalLinear(nn.Linear):
             error = y_target - y_pred
             
             # Solve for delta
-            dW_T = self._solve_ridge(x_actual, error)
-            dW = dW_T.T
-            
-            # Clip gradients to prevent massive steps from conditioning noise
-            max_norm = 1.0
-            norm = torch.norm(dW)
-            if norm > max_norm:
-                dW = dW * (max_norm / norm)
+            dW = compute_analytical_delta(x_actual, error, lam=1e-3, max_norm=1.0)
             
             self.weight.data += lr * dW
