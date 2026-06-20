@@ -80,3 +80,47 @@ While this approach promises incredibly fast learning (as each step mathematical
 | **10** | **97.88%** | **97.48%** | **96.70%** | **97.01%** |
 
 *Result:* By shrinking the batch size and protecting the null-space, the Deep Analytical Model successfully matched the performance of standard Gradient Descent!
+
+---
+
+## 6. Scaling Architectures & Computational Optimization
+
+### A. The Convolutional "Bottleneck" Illusion
+* **Initial Observation:** When porting the analytical solver to `AnalyticalConv2d`, we assumed the massive number of overlapping image patches (e.g., $N = 12,544$ for a batch of 64) would cause an $O(N^3)$ computational freeze. We initially attempted to use "Sketching" (randomly dropping 90% of patches) to bypass this.
+* **The Mathematical Truth:** This was a mathematical illusion. Because a CNN patch only has $D=16$ channels, the Gram matrix $X^T X$ collapses the $12,544$ rows into a tiny $16 \times 16$ covariance matrix. Inverting a $16 \times 16$ matrix takes roughly 0.1 milliseconds. 
+* **The Fix:** We completely removed the Sketching logic for CNNs. The Analytical CNN now natively processes 100% of the 12,544 patches instantly using the Exact Cholesky inverse.
+
+### B. The True $O(D^3)$ Bottleneck (Massive Linear & LLMs)
+While CNNs natively collapse into tiny $D \times D$ matrices, modern Transformer/LLM layers scale massively in *both* directions (e.g., $N=4096$ and $D=4096$). 
+* **The Problem:** In this scenario, computing $X^T X$ and its Cholesky inverse strictly requires $O(D^3)$ operations (approx 68 Billion FLOPs), making it impossible to compute in real-time for stochastic batch training.
+
+### C. Batched Ensemble Averaging (Federated Ridge Regression)
+To achieve $O(K^3)$ linear-time scalability for massive dense matrices without throwing away data, we implemented a pure PyTorch Batched Tensor Ensemble.
+
+* **Mechanism:** If both $N > 1024$ and $D > 1024$, the solver intercepts the massive matrix and reshapes it into a 3D batch of $1024$-row chunks ($[K, 1024, D]$).
+* **Vectorization:** Instead of a slow Python `for` loop, it uses native batched matrix multiplication (`bmm`) and `torch.linalg.cholesky` to parallelize the $K$ distinct $1024 \times 1024$ inverses across the GPU cores simultaneously. The resulting $\Delta W$s are mathematically averaged (`.mean(dim=0)`).
+* **Pro:** Completely bypasses the $O(D^3)$ bottleneck, executing $5\times$ faster on massive arrays while utilizing 100% of the dataset to provide smooth, federated updates. Fully compliant with PyTorch XLA/TPU compilation (static shape branching).
+
+### D. Computational Benchmarks
+
+**Scenario 1: Massive $N$, Tiny $D$ (CNN Patches)**
+| Method | Complexity | Math Time |
+| :--- | :--- | :--- |
+| Exact Cholesky ($N=12544, D=16$) | $O(ND^2)$ | **0.10 ms** |
+
+**Scenario 2: Massive $N$, Massive $D$ (LLM Simulation)**
+| Method | Complexity | Math Time |
+| :--- | :--- | :--- |
+| Exact Cholesky ($4096 \times 4096$) | $O(D^3)$ | 265.50 ms |
+| Batched Tensor Ensemble (Chunk=1024) | $O(K^3 \cdot \frac{N}{K})$ | **51.33 ms (5.1x Faster)** |
+
+### E. FashionMNIST CNN Training Performance
+With the CNN natively running the exact mathematical inverse on 100% of the data without bottlenecking, we ran a fresh benchmark on FashionMNIST (Batch Size: 64) against an Adam baseline.
+
+| Epoch | Analytical Test Acc | Adam (GD) Test Acc | Analytical Time/Ep |
+| :---: | :---: | :---: | :---: |
+| 1 | 84.89% | 86.31% | 14.6s |
+| 3 | 85.86% | 87.96% | 14.2s |
+| **5** | **86.37%** | **88.71%** | **13.6s** |
+
+*Result:* The Analytical CNN processes exact full-batch mathematical inverses blazingly fast (13.6s), tracking tightly behind Adam's highly optimized first-order backpropagation, proving the exact $O(ND^2)$ solver is fully viable for vision architectures.

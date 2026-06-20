@@ -58,8 +58,8 @@ def evaluate(model, dataloader, criterion, is_analytical=False):
     model.train()
     return total_loss / total, correct / total
 
-def run_experiment(epochs=10, eval_steps=1, batch_size=16,
-                   base_lr=0.01, ana_lr_base=0.07, ana_decay_ratio=0.70):
+def run_experiment(epochs=10, eval_steps=1, batch_size=128,
+                   base_lr=0.005, ana_lr_base=0.07, ana_decay_ratio=0.70):
     logger = BenchmarkLogger("4-Layer CIFAR10 Classification")
     
     # 1. Load CIFAR10 Dataset

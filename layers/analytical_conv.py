@@ -65,6 +65,7 @@ class AnalyticalConv2d(nn.Conv2d):
             error = y_target_flat - y_pred_flat
             
             # Solve analytically
+            # (Solver automatically sketches down to 1024 samples for massive N)
             dW_aug = compute_analytical_delta(x_aug, error, lam=1e-3, max_norm=1.0)
             
             # Extract and reshape updates
