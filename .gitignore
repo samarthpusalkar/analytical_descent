@@ -170,3 +170,6 @@ cython_debug/
 plots/
 results/
 data/
+
+# Hugging Face Trainer Output
+test_trainer/

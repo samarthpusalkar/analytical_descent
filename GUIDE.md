@@ -2,9 +2,51 @@
 
 This guide explains how to integrate the Analytical Target Propagation (solver-based loss calculator) into your existing PyTorch machine learning pipeline without breaking the rest of your codebase.
 
-## Overview
+## The Recommended Approach: `@analytical_solver` Decorator
 
-The Analytical Solver bypasses traditional gradient descent (e.g., `loss.backward()` and `optimizer.step()`). Instead, it uses **Forward-First Gradient-Nudged Target Propagation**. It propagates error targets backwards and solves for optimal weight updates layer-by-layer using closed-form analytical solvers (like Ridge Regression).
+The easiest and most robust way to integrate Analytical Target Propagation is to use the `@analytical_solver` decorator. This approach is completely "plug-and-play" and works with **any architecture**—including CNNs, LSTMs, and even Hugging Face Transformers.
+
+It automatically intercepts standard PyTorch gradients and solves for optimal weight updates behind the scenes.
+
+**Before:**
+```python
+import torch.nn as nn
+from transformers import BertModel # Example complex model
+
+class MyModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = BertModel.from_pretrained("bert-base-uncased")
+        self.fc = nn.Linear(768, 2)
+```
+
+**After:**
+```python
+import torch.nn as nn
+from transformers import BertModel
+from core.analytical_decorator import analytical_solver
+
+# 1. Simply add the decorator!
+@analytical_solver(lr=1.0, lr_decay=0.9, momentum=0.5, max_norm=10.0)
+class MyModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = BertModel.from_pretrained("bert-base-uncased")
+        self.fc = nn.Linear(768, 2)
+```
+
+### How it Works (Hybrid Training)
+When you call `loss.backward()` and `optimizer.step()`:
+1. The analytical solver dynamically intercepts PyTorch's gradients at every `nn.Linear` and `nn.Conv2d` layer.
+2. It solves and updates those specific layers perfectly using Woodbury Ridge Regression.
+3. It hides those gradients from your standard optimizer (like `Adam`).
+4. Complex, non-linear components (like LayerNorms, Embeddings, or custom activations) that cannot be solved analytically are simply left alone. Your `Adam` optimizer will update them normally!
+
+---
+
+## Alternative Approach: Manual Layer Swapping
+
+If you prefer explicit control over the network definition instead of using the decorator, you can manually swap PyTorch layers for their analytical equivalents.
 
 To integrate this, you only need to modify **two parts** of your codebase:
 1. The model definition (swapping standard PyTorch layers for Analytical layers).

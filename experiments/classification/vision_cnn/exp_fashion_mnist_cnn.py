@@ -89,7 +89,7 @@ def run_cnn_experiment(epochs=20, batch_size=128):
             _, ana_pred_labels = torch.max(ana_pred_b.data, 1)
             ana_correct += (ana_pred_labels == y_b).sum().item()
             
-            ana_model.backward_target(Y_onehot_b, lr=0.7, lr_decay=0.5)
+            ana_model.backward_target(Y_onehot_b, lr=1, lr_decay=0.5, use_cross_entropy=True, momentum=0.5, max_norm=10.0)
             
             # --- Baseline Step ---
             optimizer.zero_grad()

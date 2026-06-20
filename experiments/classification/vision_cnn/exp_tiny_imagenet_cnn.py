@@ -125,7 +125,7 @@ def run_tiny_imagenet_experiment(epochs=10, batch_size=128):
             
             # Deep target backprop
             # lr=0.2 provides stable EMA updates
-            ana_model.backward_target(Y_onehot_b, lr=2.0*(1-0.8*(epoch/epochs)), lr_decay=0.9, use_cross_entropy=True, max_norm=1.0, momentum=0.9)
+            ana_model.backward_target(Y_onehot_b, lr=2.0*(1-0.8*(epoch/epochs)), lr_decay=0.9, use_cross_entropy=True, max_norm=1.0, momentum=0.5)
             
             # --- Baseline Step ---
             optimizer.zero_grad()
