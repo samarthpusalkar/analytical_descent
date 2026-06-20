@@ -16,14 +16,29 @@ class AnalyticalConv2d(nn.Conv2d):
             in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias
         )
         
-    def propagate_error(self, output_error):
+    def propagate_error(self, output_error, h_in=None):
         """
         Propagates error back through the transpose convolution.
         output_error: [N, OutC, H_out, W_out]
         """
+        if h_in is not None:
+            # Dynamically calculate output padding to perfectly recover input spatial dimensions
+            s_h, s_w = (self.stride, self.stride) if isinstance(self.stride, int) else self.stride
+            p_h, p_w = (self.padding, self.padding) if isinstance(self.padding, int) else self.padding
+            d_h, d_w = (self.dilation, self.dilation) if isinstance(self.dilation, int) else self.dilation
+            k_h, k_w = (self.kernel_size, self.kernel_size) if isinstance(self.kernel_size, int) else self.kernel_size
+            
+            expected_h = (output_error.shape[2] - 1) * s_h - 2 * p_h + d_h * (k_h - 1) + 1
+            expected_w = (output_error.shape[3] - 1) * s_w - 2 * p_w + d_w * (k_w - 1) + 1
+            
+            out_pad = (h_in.shape[2] - expected_h, h_in.shape[3] - expected_w)
+        else:
+            out_pad = 0
+            
         return F.conv_transpose2d(
             output_error, self.weight.data, 
             stride=self.stride, padding=self.padding, 
+            output_padding=out_pad,
             dilation=self.dilation, groups=self.groups
         )
         

@@ -49,13 +49,19 @@ class AnalyticalSequential(nn.Module):
                     h_target = h_out_actual + current_error
                     
                     # 1. Propagate error backwards through the linear layer using OLD weights
-                    next_error = layer.propagate_error(current_error)
+                    if isinstance(layer, AnalyticalConv2d):
+                        next_error = layer.propagate_error(current_error, h_in)
+                    else:
+                        next_error = layer.propagate_error(current_error)
                     
                     # 2. Update weights safely to map actual input to the nudged target
                     layer.solve_and_update(h_in, h_target, lr=current_lr)
                     
-                    # 3. Advance to next layer
-                    current_error = next_error
+                    # 3. Advance to next layer 
+                    # CRITICAL FIX: Clamp the backpropagated error to prevent 
+                    # Quadratic Error Compounding. If weights drift slightly, 
+                    # error * weight grows exponentially across deep layers.
+                    current_error = torch.clamp(next_error, min=-1.0, max=1.0)
                     current_lr *= lr_decay
                 else:
                     # Activation layer (AnalyticalLeakyReLU)
