@@ -42,7 +42,7 @@ class AnalyticalConv2d(nn.Conv2d):
             dilation=self.dilation, groups=self.groups
         )
         
-    def solve_and_update(self, x_actual, y_target, lr=1.0):
+    def solve_and_update(self, x_actual, y_target, lr=1.0, max_norm=1.0, momentum=0.0):
         """
         Calculates the optimal filter updates analytically using Woodbury Ridge Regression.
         """
@@ -81,7 +81,7 @@ class AnalyticalConv2d(nn.Conv2d):
             
             # Solve analytically
             # (Solver automatically sketches down to 1024 samples for massive N)
-            dW_aug = compute_analytical_delta(x_aug, error, lam=1e-3, max_norm=1.0)
+            dW_aug = compute_analytical_delta(x_aug, error, lam=1e-3, max_norm=max_norm)
             
             # Extract and reshape updates
             dW_flat = dW_aug[:, :-1]
@@ -89,8 +89,15 @@ class AnalyticalConv2d(nn.Conv2d):
             
             dW = dW_flat.view(self.weight.data.shape)
             
-            self.weight.data += lr * dW
-            self.bias.data += lr * db
+            if not hasattr(self, 'dW_ema'):
+                self.dW_ema = torch.zeros_like(dW)
+                self.db_ema = torch.zeros_like(db)
+                
+            self.dW_ema = momentum * self.dW_ema + (1.0 - momentum) * dW
+            self.db_ema = momentum * self.db_ema + (1.0 - momentum) * db
+            
+            self.weight.data += lr * self.dW_ema
+            self.bias.data += lr * self.db_ema
             
         else:
             W_flat = self.weight.data.view(self.out_channels, -1)
@@ -100,7 +107,11 @@ class AnalyticalConv2d(nn.Conv2d):
             
             error = y_target_flat - y_pred_flat
             
-            dW_flat = compute_analytical_delta(x_flat, error, lam=1e-3, max_norm=1.0)
+            dW_flat = compute_analytical_delta(x_flat, error, lam=1e-3, max_norm=max_norm)
             dW = dW_flat.view(self.weight.data.shape)
             
-            self.weight.data += lr * dW
+            if not hasattr(self, 'dW_ema'):
+                self.dW_ema = torch.zeros_like(dW)
+                
+            self.dW_ema = momentum * self.dW_ema + (1.0 - momentum) * dW
+            self.weight.data += lr * self.dW_ema

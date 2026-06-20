@@ -13,5 +13,5 @@ class AnalyticalFlatten(nn.Module):
     def propagate_error(self, output_error):
         return output_error.view(self.input_shape)
         
-    def solve_and_update(self, x_actual, y_target, lr=1.0):
+    def solve_and_update(self, x_actual, y_target, lr=1.0, **kwargs):
         pass # No weights to update

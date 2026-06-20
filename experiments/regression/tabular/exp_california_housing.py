@@ -14,7 +14,7 @@ from models.analytical_network import AnalyticalSequential
 from layers.analytical_linear import AnalyticalLinear
 from core.inversions import AnalyticalLeakyReLU
 
-def run_california_experiment(epochs=30, batch_size=128):
+def run_california_experiment(epochs=100, batch_size=128):
     print("================ Analytical California Housing Benchmark ================")
     
     # 1. Dataset
@@ -66,7 +66,7 @@ def run_california_experiment(epochs=30, batch_size=128):
             ana_loss = criterion(ana_pred, y_b)
             ana_loss_total += ana_loss.item()
             
-            ana_model.backward_target(y_b, lr=0.05, lr_decay=0.9)
+            ana_model.backward_target(y_b, lr=0.01, lr_decay=0.95)
             
             # --- Gradient Descent Update ---
             optimizer.zero_grad()

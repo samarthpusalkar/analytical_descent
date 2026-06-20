@@ -24,16 +24,22 @@ class AnalyticalSequential(nn.Module):
         self.network_output = x.clone().detach()
         return x
         
-    def backward_target(self, final_target, lr=1.0, lr_decay=1.0):
+    def backward_target(self, final_target, lr=1.0, lr_decay=1.0, use_cross_entropy=False, max_norm=1.0, momentum=0.0):
         """
         Implements Forward-First Gradient-Nudged Target Propagation.
         """
         # Calculate output error
-        # We use the gradient of the Huber Loss (clamped MSE) to prevent
-        # massive gradient explosions from large confident logits while preserving
-        # the stabilizing 'spring' effect of MSE for bounded regression.
-        raw_error = final_target - self.network_output
-        current_error = torch.clamp(raw_error, min=-1.0, max=1.0)
+        if use_cross_entropy:
+            import torch.nn.functional as F
+            # Exact derivative of Cross Entropy w.r.t logits is (target - softmax)
+            probs = F.softmax(self.network_output, dim=-1)
+            current_error = final_target - probs
+        else:
+            # We use the gradient of the Huber Loss (clamped MSE) to prevent
+            # massive gradient explosions from large confident logits while preserving
+            # the stabilizing 'spring' effect of MSE for bounded regression.
+            raw_error = final_target - self.network_output
+            current_error = torch.clamp(raw_error, min=-1.0, max=1.0)
             
         current_lr = lr
         
@@ -55,7 +61,7 @@ class AnalyticalSequential(nn.Module):
                         next_error = layer.propagate_error(current_error)
                     
                     # 2. Update weights safely to map actual input to the nudged target
-                    layer.solve_and_update(h_in, h_target, lr=current_lr)
+                    layer.solve_and_update(h_in, h_target, lr=current_lr, max_norm=max_norm, momentum=momentum)
                     
                     # 3. Advance to next layer 
                     # CRITICAL FIX: Clamp the backpropagated error to prevent 

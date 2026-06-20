@@ -18,7 +18,7 @@ class AnalyticalLinear(nn.Linear):
         return output_error @ self.weight.data
         
         
-    def solve_and_update(self, x_actual, y_target, lr=1.0):
+    def solve_and_update(self, x_actual, y_target, lr=1.0, max_norm=1.0, momentum=0.0):
         """
         Calculates the optimal weight updates using Delta-Regularized Ridge Regression.
         This minimizes ||X_aug (W + dW)^T - Y_target||^2 + lam ||dW||^2.
@@ -37,20 +37,32 @@ class AnalyticalLinear(nn.Linear):
             error = y_target - y_pred
             
             # Solve for delta
-            dW_aug = compute_analytical_delta(x_aug, error, lam=1e-3, max_norm=1.0)
+            dW_aug = compute_analytical_delta(x_aug, error, lam=1e-3, max_norm=max_norm)
             
             # Extract weights and bias deltas
             dW = dW_aug[:, :-1]
             db = dW_aug[:, -1]
             
-            self.weight.data += lr * dW
-            self.bias.data += lr * db
+            if not hasattr(self, 'dW_ema'):
+                self.dW_ema = torch.zeros_like(dW)
+                self.db_ema = torch.zeros_like(db)
+                
+            self.dW_ema = momentum * self.dW_ema + (1.0 - momentum) * dW
+            self.db_ema = momentum * self.db_ema + (1.0 - momentum) * db
+            
+            self.weight.data += lr * self.dW_ema
+            self.bias.data += lr * self.db_ema
+            
         else:
             # Calculate current prediction and error
             y_pred = x_actual @ self.weight.data.T
             error = y_target - y_pred
             
             # Solve for delta
-            dW = compute_analytical_delta(x_actual, error, lam=1e-3, max_norm=1.0)
+            dW = compute_analytical_delta(x_actual, error, lam=1e-3, max_norm=max_norm)
             
-            self.weight.data += lr * dW
+            if not hasattr(self, 'dW_ema'):
+                self.dW_ema = torch.zeros_like(dW)
+                
+            self.dW_ema = momentum * self.dW_ema + (1.0 - momentum) * dW
+            self.weight.data += lr * self.dW_ema
