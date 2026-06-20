@@ -34,7 +34,7 @@ def evaluate(model, dataloader, criterion):
     model.train()
     return total_loss / total, correct / total
 
-def run_cnn_experiment(epochs=5, batch_size=64):
+def run_cnn_experiment(epochs=20, batch_size=128):
     logger = BenchmarkLogger("Analytical CNN on FashionMNIST")
     
     transform = transforms.Compose([
@@ -89,7 +89,7 @@ def run_cnn_experiment(epochs=5, batch_size=64):
             _, ana_pred_labels = torch.max(ana_pred_b.data, 1)
             ana_correct += (ana_pred_labels == y_b).sum().item()
             
-            ana_model.backward_target(Y_onehot_b, lr=0.1, lr_decay=0.5)
+            ana_model.backward_target(Y_onehot_b, lr=0.7, lr_decay=0.5)
             
             # --- Baseline Step ---
             optimizer.zero_grad()
